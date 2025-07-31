@@ -1,11 +1,16 @@
 import uvicorn
+import docker
 
 from fastapi import FastAPI, APIRouter
+from fastapi.responses import JSONResponse
 
 
 ####################################################################################################
 
 app = FastAPI()
+
+client = docker.from_env()
+
 
 
 ####################################################################################################
@@ -21,66 +26,78 @@ async def register():
 async def login():
    pass
 
-@users.get("/users/me")                                                       # Получение информации о текущем пользователе
-async def users_me():
+@users.get("/users/info")                                                     # Получение информации о текущем пользователе
+async def usersInfo():
    pass
 
 
 ####################################################################################################
+# Блок работы с контейнерами
 
-containers1 = APIRouter(prefix="/containers", tags=["containers"])
 
-@containers1.get("/")
-async def containers():
+containers = APIRouter(prefix="/containers", tags=["containers"])
+
+@containers.get("/")                                                          # Получение списка контейнеров
+async def containersList():
+
+
+   print(client.containers.run("fedora", "echo hello world"))
+   print(client.containers.run("bfirsh/reticulate-splines", detach=True))
+
+
+   return JSONResponse(client.containers.list())
+
+@containers.post("/")                                                         # Создание контейнера
+async def containersCreate():
+   return client.containers.create()
+
+@containers.get("/{id}")                                                      # Получение информации о контейнере
+async def containersInfo(id):
+   return client.containers.get(id)
+
+@containers.post("/{id}/start")                                               # Зпуск контейнера
+async def containersStart():
    pass
 
-@containers1.post("/")
-async def containers():
+@containers.post("/{id}/stop")                                                # Остановка контейнера
+async def containersStop():
    pass
 
-@containers1.get("/{id}")
-async def containers():
+@containers.post("/{id}/restart")                                             # Перезапуск контейнера
+async def containersRestart():
    pass
 
-@containers1.post("/{id}/start")
-async def containers():
-   pass
-
-@containers1.post("/{id}/stop")
-async def containers():
-   pass
-
-@containers1.post("/{id}/restart")
-async def containers():
-   pass
-
-@containers1.delete("/{id}")
-async def containers():
-   pass
-
-
-####################################################################################################
-
-repositories1 = APIRouter(prefix="/repositories", tags=["repositories"])
-
-@repositories1.post("/")
-async def repositories():
-   pass
-
-@repositories1.get("/")
-async def repositories():
-   pass
-
-@repositories1.get("/{id}")
-async def repositories():
+@containers.delete("/{id}")                                                   # Удаление контейнера
+async def containersDelete():
    pass
 
 
 ####################################################################################################
+# Блок работы с репозиториями
+
+
+repositories = APIRouter(prefix="/repositories", tags=["repositories"])
+
+@repositories.post("/")                                                       # 
+async def repositoriesCreate():
+   pass
+
+@repositories.get("/")                                                        # Получение списка репозиториев
+async def repositoriesList():
+   pass
+
+@repositories.get("/{id}")                                                    # Получение информации о рипози
+async def repositoriesInfo():
+   pass
+
+
+####################################################################################################
+# Блок подключения роутеров
+
 
 app.include_router(users)
-app.include_router(containers1)
-app.include_router(repositories1)
+app.include_router(containers)
+app.include_router(repositories)
 
 ####################################################################################################
 
