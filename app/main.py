@@ -6,36 +6,53 @@ import sys
 import psycopg2
 
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-
-from sqlalchemy import create_engine
+from psycopg2 import sql
 
 from git import Repo
+
+from pathlib import Path
 
 from fastapi import FastAPI, APIRouter
 from fastapi.responses import JSONResponse
 
 from pydantic import BaseModel, Field
 
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
+
+from conf import *
+from db.control_db import ControlTable
+
 ####################################################################################################
 
-connection = psycopg2.connect(users="Red-Soft", password="password")
-connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+# Подключение к базе данных postgres
+connection = psycopg2.connect(
+dbname=DBNAME,
+user=USER,
+password=PASSWORD,
+host=HOST,
+port=PORT
+)
 
+connection.autocommit = True
 
 cursor = connection.cursor()
 
+connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 
-cursor.execute('create database Repositories')
+db_name = 'containersDB'
 
+# Проверка существования базы данных
+cursor.execute("SELECT 1 FROM pg_database WHERE datname=%s", (db_name,))
+exists = cursor.fetchone()
 
-# engine = create_engine("postgresql+psycopg2://root:pass@localhost/mydb")
-# engine.connect()
-
-# print(engine)
+if not exists:
+    # Создание базы данных, если её нет
+    cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db_name)))
 
 ####################################################################################################
 
-def signal_handler(sig, frame):
+def signal_handler():
    cursor.close()
    connection.close()
 
@@ -49,12 +66,38 @@ app = FastAPI()
 
 client = docker.from_env()
 
+controlTable = ControlTable(cursor=cursor)
+
 ####################################################################################################
 
 class User(BaseModel):
 
    login: str = Field(min_length=3)
    password: str = Field(min_length=6)
+
+####################################################################################################
+
+controlTable.createTable(table_name="Users", 
+                        fields= [
+                           ('login', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(login) >= 3)'),
+                           ('password', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(password) >= 6)')
+                           ]
+                     )
+
+controlTable.createTable(table_name="Containers", 
+                        fields= [
+                           ('login', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(login) >= 3)'),
+                           ('password', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(password) >= 6)')
+                           ],
+                        cursor=cursor
+                     )
+
+controlTable.createTable(table_name="Repositories", 
+                        fields= [
+                           ('login', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(login) >= 3)'),
+                           ('password', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(password) >= 6)')
+                           ]
+                     )
 
 ####################################################################################################
 # Блок работы с пользователем
