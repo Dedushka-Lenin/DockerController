@@ -30,44 +30,31 @@ Alembic
 
 ####################################################################################################
 
-Public Repositories of Python
+   nginx-alpine
 
-https://github.com/psf/requests
-https://github.com/pallets/flask
-https://github.com/django/django
+   Описание: Легкий образ Nginx на базе Alpine Linux.
+   URL: https://github.com/nginxinc/docker-nginx
+   alpine-python
 
-Образцы репозиториев с открытым исходным кодом на JavaScript
+   Описание: Минимальный образ Python на базе Alpine Linux.
+   URL: https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker
+   hello-world
 
-https://github.com/facebook/react
-https://github.com/vuejs/vue
-https://github.com/nodejs/node
+   Описание: Очень маленький контейнер, который просто выводит сообщение "Hello World".
+   URL: https://github.com/docker-library/hello-world
+   busybox
 
-Репозитории на Go
+   Описание: Минимальный образ с утилитами BusyBox.
+   URL: https://github.com/mirror/busybox
+   alpine
 
-https://github.com/gin-gonic/gin
-https://github.com/prometheus/prometheus
+   Описание: Стандартный минимальный образ Linux на базе Alpine Linux.
+   URL: https://github.com/alpinelinux/docker-alpine
+   node-alpine
 
-Образцы репозиториев на C++
+   Описание: Легкий образ Node.js на базе Alpine Linux.
+   URL: https://github.com/nodejs/docker-node
+   python-minimal
 
-https://github.com/google/googletest
-https://github.com/llvm/llvm-project
-
-Маленькие репозитории для быстрого тестирования
-
-https://github.com/octocat/Hello-World
-https://github.com/github/gitignore
-
-####################################################################################################
-
-   # # Клонирование репозитория
-   # repo_url = 'https://github.com/username/repository.git'
-   # local_path = '/path/to/local/repo'
-
-   # Repo.clone_from(repo_url, local_path)
-
-   # # Построение образа
-   # client = docker.from_env()
-   # image, build_logs = client.images.build(path=local_path, tag='my_image_name')
-
-   # # Запуск контейнера
-   # container = client.containers.run('my_image_name', detach=True)
+   Описание: Минимальный образ Python для быстрого развертывания.
+   URL: https://github.com/docker-library/python

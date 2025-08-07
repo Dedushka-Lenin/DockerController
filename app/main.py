@@ -4,7 +4,9 @@ import os
 import signal
 import sys
 import requests
+import subprocess
 import psycopg2
+import git
 
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from psycopg2 import sql
@@ -80,13 +82,6 @@ controlTable = ControlTable(cursor=cursor)
 
 ####################################################################################################
 
-class User(BaseModel):
-
-   login: str = Field(min_length=3)
-   password: str = Field(min_length=6)
-
-####################################################################################################
-
 controlTable.createTable(table_name="users", 
                         fields= [
                            ('login', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(login) >= 3)'),
@@ -96,20 +91,41 @@ controlTable.createTable(table_name="users",
 
 controlTable.createTable(table_name="containers", 
                         fields= [
-                           ('useri_id', 'INTEGER', 'NOT NULL'),
-                           ('repositoriesID', 'INTEGER', 'NOT NULL'),
+                           ('user_id', 'INTEGER', 'NOT NULL'),
+                           ('repositories_id', 'INTEGER', 'NOT NULL'),
                            ('version', 'VARCHAR(255)', 'NOT NULL')
                            ],
                      )
 
 controlTable.createTable(table_name="repositories", 
                         fields= [
-                           ('useri_id', 'INTEGER', 'NOT NULL'),
+                           ('user_id', 'INTEGER', 'NOT NULL'),
                            ('url', 'VARCHAR(255)', 'NOT NULL'),
                            ('name', 'VARCHAR(255)', 'NOT NULL'),
                            ('description', 'VARCHAR(255)', 'NOT NULL')
                            ]
                      )
+
+controlTable.createTable(table_name="version", 
+                        fields= [
+                           ('repositories_id', 'INTEGER', 'NOT NULL'),
+                           ('version', 'VARCHAR(255)', 'NOT NULL')
+                           ],
+                     )
+
+####################################################################################################
+
+class User(BaseModel):
+
+   login: str = Field(min_length=3)
+   password: str = Field(min_length=6)
+
+
+class Containers(BaseModel):
+
+   repositories_id: int
+   version: str = Field(default_factory='')
+
 
 ####################################################################################################
 # Блок работы с пользователем
@@ -154,9 +170,63 @@ async def containersList():
    return JSONResponse(container_list)
 
 @containers.post("/", status_code=200)                                                         # Создание нового контейнера из репозитория
-async def containersCreation():
+async def containersCreation(data:Containers):
 
-   container = client.containers.run("bfirsh/reticulate-splines", detach=True)
+   repo_info = controlTable.fetchRecordTable(
+      table_name='repositories', 
+      conditions={
+         'id':data.repositories_id
+         }
+      )
+
+   # Клонирование репозитория
+   repo_url = repo_info[0]['url']
+
+   base_dir = f'./repo/{repo_info[0]["name"]}/{data.version}'
+
+   image_name = 'my_custom_image:latest'  # Имя и тег образа
+   container_name = f'15111'  # Имя контейнера
+
+   # Шаг 1: Клонируем репозиторий (если нужно)
+   if not os.path.exists(base_dir):
+      # Попытка клонировать с указанием ветки
+      try:
+         git.Repo.clone_from(
+               url=repo_url,
+               to_path=base_dir,
+               branch=data.version,
+               depth=1
+         )
+      except git.exc.GitCommandError as e:
+         # Если ветка не найдена, клонируем без указания ветки
+         print(f"Ветка '{data.version}' не найдена. Клонирование без указания ветки.")
+         git.Repo.clone_from(
+               url=repo_url,
+               to_path=base_dir,
+               depth=1
+         )
+
+   else:
+      print("Репозиторий уже клонирован.")
+
+   # Шаг 2: Создаем клиент Docker
+   client = docker.from_env()
+
+   # Шаг 3: Строим образ из клонированного репозитория
+   print("Строим Docker-образ...")
+   image, logs = client.images.build(path=base_dir, tag=image_name)
+
+   # Вывод логов сборки (опционально)
+   for log in logs:
+      if 'stream' in log:
+         print(log['stream'].strip())
+
+   # Шаг 4: Запускаем контейнер из образа
+   print("Запускаем контейнер...")
+
+   container = client.containers.run(image_name, name=container_name, detach=True)
+
+   print(f"Контейнер '{container_name}' запущен.")
 
    info = container.attrs
 
@@ -213,6 +283,8 @@ repositories = APIRouter(prefix="/repositories", tags=["repositories"])
 @repositories.post("/", status_code=200)                                                       # Добавление нового репозитоория
 async def repositoriesCreation(url:str):
 
+   user_id = '123456789'
+
    parts = url.rstrip('/').split('/')
    owner = parts[-2]
    repo = parts[-1]
@@ -230,24 +302,72 @@ async def repositoriesCreation(url:str):
       print(f"Описание: {description}")
       print(f"URL: {html_url}")
    
-   data = {
-      'useri_id':'123456',
+      # Выполняем команду для получения тегов по URL
+      result = subprocess.run(
+         ['git', 'ls-remote', '--tags', url],
+         capture_output=True,
+         text=True,
+         check=True
+      )
+      lines = result.stdout.strip().split('\n')
+      tags = []
+      for line in lines:
+         parts = line.split()
+         if len(parts) == 2:
+               ref = parts[1]
+               # ref выглядит как refs/tags/v1.0.0
+               if ref.startswith('refs/tags/'):
+                  tag_name = ref[len('refs/tags/'):]
+                  tags.append(tag_name)
+
+      print(tags)
+
+   repositories_data = {
+      'user_id':user_id,
       'url': url,
       'name':full_name,
       'description': description
    }
 
-   controlTable.creatingRecordTable(table_name='repositories', data=data)
+   message = controlTable.creatingRecordTable(table_name='repositories', data=repositories_data)
+
+   for version in tags:
+
+      repositories_version_data = {
+         'repositories_id':message['id'],
+         'version':version
+      }
+
+      controlTable.creatingRecordTable(table_name='version', data=repositories_version_data)
+
+   
 
 @repositories.get("/", status_code=200)                                                        # Список репозиториев
 async def repositoriesList():
-   result = controlTable.fetchRecordTable(table_name='repositories')
+
+   user_id = '123456789'
+
+   result = controlTable.fetchRecordTable(
+      table_name='repositories', 
+      conditions={
+         'user_id':user_id
+         }
+      )
 
    return result
 
 @repositories.get("/{id}", status_code=200)                                                    # Вывод информации о репозитории
 async def repositoriesInfo(id):
-   result = controlTable.fetchRecordTable(table_name='repositories', conditions={'id':id})
+
+   user_id = '123456789'
+
+   result = controlTable.fetchRecordTable(
+      table_name='repositories', 
+      conditions={
+         'id':id,
+         'user_id':user_id
+         }
+      )
 
    return result
 

@@ -91,10 +91,12 @@ class ControlTable():
         placeholders = ", ".join(["%s"] * len(values))
         columns_str = ", ".join(columns)
         
-        query = f"INSERT INTO {table_name}({columns_str}) VALUES ({placeholders})"
+        query = f"INSERT INTO {table_name}({columns_str}) VALUES ({placeholders}) RETURNING id"
         self.cursor.execute(query, values)
 
-        return {"exists": True, "message": "Запись успешно созданна"}
+        id = self.cursor.fetchone()[0]
+
+        return {"exists": True, "message": "Запись успешно созданна", "id":id}
 
     # Функция удаления записи
     def deleteRecordTable(self, table_name, id):
@@ -148,36 +150,40 @@ class ControlTable():
 
 ####################################################################################################
 
+    # Функция вывода информации о записи
     def fetchRecordTable(self, table_name, conditions=None):
         """
         Получает записи из таблицы по заданным условиям.
         :param table_name: имя таблицы (строка)
         :param conditions: dict с условиями {column: value} или None для без условий
         :return: список кортежей с результатами
-        """
+        """ 
 
         # Формируем условие WHERE, если есть
+
         if conditions:
             condition_clauses = []
             values = []
             for col, val in conditions.items():
                 condition_clauses.append(sql.SQL("{} = %s").format(sql.Identifier(col)))
                 values.append(val)
-            where_clause = sql.SQL(" WHERE ").join([
-                sql.SQL(""),
-                sql.SQL(" AND ").join(condition_clauses)
-            ])
+            where_clause = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(condition_clauses)
         else:
             where_clause = sql.SQL("")
             values = []
 
-        # Полный запрос
-        query = sql.SQL("SELECT * FROM {table_name} {where}").format(
-            table_name=sql.Identifier(table_name),
-            where=where_clause
+        query = sql.SQL("SELECT * FROM {table_name}").format(
+            table_name=sql.Identifier(table_name)
         )
+        query += where_clause
 
         self.cursor.execute(query, values)
-        results = self.cursor.fetchall()
+        rows = self.cursor.fetchall()
 
-        return results
+        # Получаем имена колонок
+        col_names = [desc[0] for desc in self.cursor.description]
+
+        # Преобразуем каждую строку в словарь
+        result_list = [dict(zip(col_names, row)) for row in rows]
+
+        return result_list
