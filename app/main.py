@@ -3,14 +3,13 @@ import docker
 import os
 import signal
 import sys
+import requests
 import psycopg2
 
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from psycopg2 import sql
 
 from git import Repo
-
-from pathlib import Path
 
 from fastapi import FastAPI, APIRouter
 from fastapi.responses import JSONResponse
@@ -27,18 +26,16 @@ from db.control_db import ControlTable
 
 # Подключение к базе данных postgres
 connection = psycopg2.connect(
-dbname=DBNAME,
-user=USER,
-password=PASSWORD,
-host=HOST,
-port=PORT
+   dbname=DBNAME,
+   user=USER,
+   password=PASSWORD,
+   host=HOST,
+   port=PORT
 )
 
 connection.autocommit = True
 
 cursor = connection.cursor()
-
-connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 
 db_name = 'containersDB'
 
@@ -50,13 +47,26 @@ if not exists:
     # Создание базы данных, если её нет
     cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db_name)))
 
+connection = psycopg2.connect(
+   dbname=db_name,
+   user=USER,
+   password=PASSWORD,
+   host=HOST,
+   port=PORT
+)
+
+connection.autocommit = True
+
+cursor = connection.cursor()
+
+connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+
 ####################################################################################################
 
-def signal_handler():
-   cursor.close()
-   connection.close()
-
-   sys.exit(0)
+def signal_handler(signum, frame):
+    cursor.close()
+    connection.close()
+    sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -77,25 +87,27 @@ class User(BaseModel):
 
 ####################################################################################################
 
-controlTable.createTable(table_name="Users", 
+controlTable.createTable(table_name="users", 
                         fields= [
                            ('login', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(login) >= 3)'),
                            ('password', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(password) >= 6)')
                            ]
                      )
 
-controlTable.createTable(table_name="Containers", 
+controlTable.createTable(table_name="containers", 
                         fields= [
-                           ('login', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(login) >= 3)'),
-                           ('password', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(password) >= 6)')
+                           ('useri_id', 'INTEGER', 'NOT NULL'),
+                           ('repositoriesID', 'INTEGER', 'NOT NULL'),
+                           ('version', 'VARCHAR(255)', 'NOT NULL')
                            ],
-                        cursor=cursor
                      )
 
-controlTable.createTable(table_name="Repositories", 
+controlTable.createTable(table_name="repositories", 
                         fields= [
-                           ('login', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(login) >= 3)'),
-                           ('password', 'VARCHAR(255)', 'NOT NULL CHECK (LENGTH(password) >= 6)')
+                           ('useri_id', 'INTEGER', 'NOT NULL'),
+                           ('url', 'VARCHAR(255)', 'NOT NULL'),
+                           ('name', 'VARCHAR(255)', 'NOT NULL'),
+                           ('description', 'VARCHAR(255)', 'NOT NULL')
                            ]
                      )
 
@@ -199,30 +211,45 @@ repositories = APIRouter(prefix="/repositories", tags=["repositories"])
 
 
 @repositories.post("/", status_code=200)                                                       # Добавление нового репозитоория
-async def repositoriesCreation():
-   # # Клонирование репозитория
-   # repo_url = 'https://github.com/username/repository.git'
-   # local_path = '/path/to/local/repo'
+async def repositoriesCreation(url:str):
 
-   # Repo.clone_from(repo_url, local_path)
+   parts = url.rstrip('/').split('/')
+   owner = parts[-2]
+   repo = parts[-1]
 
-   # # Построение образа
-   # client = docker.from_env()
-   # image, build_logs = client.images.build(path=local_path, tag='my_image_name')
+   api_url = f"https://api.github.com/repos/{owner}/{repo}"
 
-   # # Запуск контейнера
-   # container = client.containers.run('my_image_name', detach=True)
+   response = requests.get(api_url)
+   if response.status_code == 200:
+      data = response.json()
 
-   pass
+      description = data.get('description', 'Нет описания')
+      full_name = data.get('full_name', '')
+      html_url = data.get('html_url', '')
+      print(f"Репозиторий: {full_name}")
+      print(f"Описание: {description}")
+      print(f"URL: {html_url}")
+   
+   data = {
+      'useri_id':'123456',
+      'url': url,
+      'name':full_name,
+      'description': description
+   }
+
+   controlTable.creatingRecordTable(table_name='repositories', data=data)
 
 @repositories.get("/", status_code=200)                                                        # Список репозиториев
 async def repositoriesList():
-   pass
+   result = controlTable.fetchRecordTable(table_name='repositories')
+
+   return result
 
 @repositories.get("/{id}", status_code=200)                                                    # Вывод информации о репозитории
-async def repositoriesInfo():
-   pass
+async def repositoriesInfo(id):
+   result = controlTable.fetchRecordTable(table_name='repositories', conditions={'id':id})
 
+   return result
 
 ####################################################################################################
 

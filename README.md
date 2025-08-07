@@ -58,3 +58,16 @@ https://github.com/octocat/Hello-World
 https://github.com/github/gitignore
 
 ####################################################################################################
+
+   # # Клонирование репозитория
+   # repo_url = 'https://github.com/username/repository.git'
+   # local_path = '/path/to/local/repo'
+
+   # Repo.clone_from(repo_url, local_path)
+
+   # # Построение образа
+   # client = docker.from_env()
+   # image, build_logs = client.images.build(path=local_path, tag='my_image_name')
+
+   # # Запуск контейнера
+   # container = client.containers.run('my_image_name', detach=True)
