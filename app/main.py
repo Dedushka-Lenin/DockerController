@@ -92,7 +92,6 @@ controlTable.createTable(table_name="users",
 controlTable.createTable(table_name="containers", 
                         fields= [
                            ('user_id', 'INTEGER', 'NOT NULL'),
-                           ('containers_id', 'VARCHAR(255)', 'NOT NULL'),
                            ('containers_name', 'VARCHAR(255)', 'NOT NULL'),
                            ('repositories_id', 'INTEGER', 'NOT NULL'),
                            ('version', 'VARCHAR(255)', 'NOT NULL')
@@ -159,15 +158,18 @@ containers = APIRouter(prefix="/containers", tags=["containers"])
 async def containersList():
    container_list = []
 
-   for container in client.containers.list():
+   # Получить список всех контейнеров (запущенных и остановленных)
+   containers = client.containers.list(all=True)
 
-      container_list.append(
-         {
-            'id' : container.id, 
-            'name' : container.name, 
-            'status' : container.status
-            }
-         )
+   # Вывести информацию о каждом контейнере
+   for container in containers:
+
+      container_list.append({
+         'id': container.id,
+         'name':container.name,
+         'status':container.status
+         }
+      )
       
    return JSONResponse(container_list)
 
@@ -180,6 +182,9 @@ async def containers_creation(data: Containers):
       table_name='repositories',
       conditions={'id': data.repositories_id}
    )
+
+   if repo_info == []:
+      return JSONResponse(content={'message':f'id - {data.repositories_id} не существует'}, status_code=400)
 
    repo_info = repo_info[0]
    repo_url = repo_info['url']
@@ -201,7 +206,7 @@ async def containers_creation(data: Containers):
       )
       
       if mes == []:
-         return JSONResponse(content={'message':'Не существующая версия'}, status_code=400)
+         return JSONResponse(content={'message':'Несуществующая версия'}, status_code=400)
       
       else:
          base_dir = f'./repo/{repo_name}/{data.version}'
@@ -244,7 +249,6 @@ async def containers_creation(data: Containers):
 
    repositories_data = {
       'user_id': user_id,
-      'containers_id': container.id,
       'containers_name': container_name,
       'repositories_id': data.repositories_id,
       'version': data.version
@@ -254,42 +258,61 @@ async def containers_creation(data: Containers):
 
    return {"message": f"Контейнер {info} успешно запущен"}
 
-@containers.get("/{id}", status_code=200)                                                      # Получение информации о контейнере
-async def containersInfo(id):
+@containers.get("/{name}", status_code=200)                                                      # Получение информации о контейнере
+async def containersInfo(name):
+
+   mes = controlTable.fetchRecordTable(
+      table_name='containers',
+      conditions={'containers_name': name}
+   )
+
+   if mes == []:
+      return {"message": "Контейнер не существует"}
    
-   container = client.containers.get(id)
+   container = client.containers.get(name)
    info = container.attrs
 
    return JSONResponse(info)
 
-@containers.post("/{id}/start", status_code=200)                                               # Запуск контейнера
-async def containersStart(id):
-   
-   container = client.containers.get(id)
+@containers.post("/{name}/start", status_code=200)                                               # Запуск контейнера
+async def containersStart(name):
+
+   mes = controlTable.fetchRecordTable(
+      table_name='containers',
+      conditions={'containers_name': name}
+   )
+
+   if mes == []:
+      return {"message": "Контейнер не существует"}
+
+   container = client.containers.get(name)
+
+   container.status
+
    container.start
 
    return {"message": "Контейнер успешно запущен"}
    
-@containers.post("/{id}/stop", status_code=200)                                                # Остановка контейнера
-async def containersStop(id):
+@containers.post("/{name}/stop", status_code=200)                                                # Остановка контейнера
+async def containersStop(name):
 
-   container = client.containers.get(id)
+   container = client.containers.get(name)
    container.stop()
 
    return {"message": "Контейнер успешно остановлен"}
 
-@containers.post("/{id}/restart", status_code=200)                                             # Перезапуск контейнера
-async def containersRestart(id):
+@containers.post("/{name}/restart", status_code=200)                                             # Перезапуск контейнера
+async def containersRestart(name):
 
-   container = client.containers.get(id)
+   container = client.containers.get(name)
    container.restart()
 
    return {"message": "Контейнер успешно перезапущен"}
 
-@containers.delete("/{id}", status_code=200)                                                   # Удаление котейнера
-async def containersDelete(id):
+@containers.delete("/{name}", status_code=200)                                                   # Удаление котейнера
+async def containersDelete(name):
 
-   container = client.containers.get(id)
+   container = client.containers.get(name)
    container.remove()
 
    return {"message": "Контейнер успешно удален"}
