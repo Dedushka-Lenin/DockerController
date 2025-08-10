@@ -92,6 +92,8 @@ controlTable.createTable(table_name="users",
 controlTable.createTable(table_name="containers", 
                         fields= [
                            ('user_id', 'INTEGER', 'NOT NULL'),
+                           ('containers_id', 'VARCHAR(255)', 'NOT NULL'),
+                           ('containers_name', 'VARCHAR(255)', 'NOT NULL'),
                            ('repositories_id', 'INTEGER', 'NOT NULL'),
                            ('version', 'VARCHAR(255)', 'NOT NULL')
                            ],
@@ -101,7 +103,7 @@ controlTable.createTable(table_name="repositories",
                         fields= [
                            ('user_id', 'INTEGER', 'NOT NULL'),
                            ('url', 'VARCHAR(255)', 'NOT NULL'),
-                           ('name', 'VARCHAR(255)', 'NOT NULL'),
+                           ('repositories_name', 'VARCHAR(255)', 'NOT NULL'),
                            ('description', 'VARCHAR(255)', 'NOT NULL')
                            ]
                      )
@@ -170,67 +172,87 @@ async def containersList():
    return JSONResponse(container_list)
 
 @containers.post("/", status_code=200)                                                         # Создание нового контейнера из репозитория
-async def containersCreation(data:Containers):
+async def containers_creation(data: Containers):
+   
+   user_id = '123456789'
 
    repo_info = controlTable.fetchRecordTable(
-      table_name='repositories', 
-      conditions={
-         'id':data.repositories_id
-         }
-      )
+      table_name='repositories',
+      conditions={'id': data.repositories_id}
+   )
 
-   # Клонирование репозитория
-   repo_url = repo_info[0]['url']
+   repo_info = repo_info[0]
+   repo_url = repo_info['url']
+   repo_name = repo_info['repositories_name']
 
-   base_dir = f'./repo/{repo_info[0]["name"]}/{data.version}'
 
-   image_name = 'my_custom_image:latest'  # Имя и тег образа
-   container_name = f'15111'  # Имя контейнера
-
-   # Шаг 1: Клонируем репозиторий (если нужно)
-   if not os.path.exists(base_dir):
-      # Попытка клонировать с указанием ветки
-      try:
-         git.Repo.clone_from(
-               url=repo_url,
-               to_path=base_dir,
-               branch=data.version,
-               depth=1
-         )
-      except git.exc.GitCommandError as e:
-         # Если ветка не найдена, клонируем без указания ветки
-         print(f"Ветка '{data.version}' не найдена. Клонирование без указания ветки.")
-         git.Repo.clone_from(
-               url=repo_url,
-               to_path=base_dir,
-               depth=1
-         )
+   if data.version == '':
+      base_dir = f'./repo/{repo_name}'
+      image_name = f'{repo_name}'
+      container_name = f'{user_id}.{repo_name}'
 
    else:
-      print("Репозиторий уже клонирован.")
+      mes = controlTable.fetchRecordTable(
+      table_name='version', 
+      conditions={
+         'version':data.version,
+         'repositories_id':data.repositories_id
+         }
+      )
+      
+      if mes == []:
+         return JSONResponse(content={'message':'Не существующая версия'}, status_code=400)
+      
+      else:
+         base_dir = f'./repo/{repo_name}/{data.version}'
+         image_name = f'{repo_name}:{data.version}'
+         container_name = f'{user_id}.{repo_name}.{data.version}'
 
-   # Шаг 2: Создаем клиент Docker
-   client = docker.from_env()
+   mes = controlTable.fetchRecordTable(
+      table_name='containers',
+      conditions={'containers_name': container_name}
+   )
 
-   # Шаг 3: Строим образ из клонированного репозитория
-   print("Строим Docker-образ...")
-   image, logs = client.images.build(path=base_dir, tag=image_name)
+   cont = client.containers.list(all=True)
 
-   # Вывод логов сборки (опционально)
-   for log in logs:
-      if 'stream' in log:
-         print(log['stream'].strip())
+   # Проверить наличие контейнера с нужным именем
+   container_exists = any(c.name == container_name for c in cont)
 
-   # Шаг 4: Запускаем контейнер из образа
-   print("Запускаем контейнер...")
+   if mes != [] and container_exists:
+      return {"message": "Контейнер уже существует"}
+
+   if not os.path.exists(base_dir):
+      if data.version == '':
+         git.Repo.clone_from(
+            url=repo_url,
+            to_path=base_dir,
+            depth=1
+         )
+
+      else:
+         git.Repo.clone_from(
+            url=repo_url,
+            to_path=base_dir,
+            branch=data.version,
+            depth=1
+         )
+
+   client.images.build(path=base_dir, tag=image_name)
 
    container = client.containers.run(image_name, name=container_name, detach=True)
-
-   print(f"Контейнер '{container_name}' запущен.")
-
    info = container.attrs
 
-   return JSONResponse({"message": "контейнер успешно созданн", "info": info})
+   repositories_data = {
+      'user_id': user_id,
+      'containers_id': container.id,
+      'containers_name': container_name,
+      'repositories_id': data.repositories_id,
+      'version': data.version
+   }
+   
+   controlTable.creatingRecordTable(table_name='containers', data=repositories_data)
+
+   return {"message": f"Контейнер {info} успешно запущен"}
 
 @containers.get("/{id}", status_code=200)                                                      # Получение информации о контейнере
 async def containersInfo(id):
@@ -285,6 +307,17 @@ async def repositoriesCreation(url:str):
 
    user_id = '123456789'
 
+   mes = controlTable.fetchRecordTable(
+      table_name='repositories', 
+      conditions={
+         'user_id':user_id,
+         'url':url
+         }
+      )
+   
+   if mes != []:
+      return {"message": "Репозиторий уже существует"}
+
    parts = url.rstrip('/').split('/')
    owner = parts[-2]
    repo = parts[-1]
@@ -297,10 +330,6 @@ async def repositoriesCreation(url:str):
 
       description = data.get('description', 'Нет описания')
       full_name = data.get('full_name', '')
-      html_url = data.get('html_url', '')
-      print(f"Репозиторий: {full_name}")
-      print(f"Описание: {description}")
-      print(f"URL: {html_url}")
    
       # Выполняем команду для получения тегов по URL
       result = subprocess.run(
@@ -309,8 +338,10 @@ async def repositoriesCreation(url:str):
          text=True,
          check=True
       )
+
       lines = result.stdout.strip().split('\n')
       tags = []
+
       for line in lines:
          parts = line.split()
          if len(parts) == 2:
@@ -320,25 +351,27 @@ async def repositoriesCreation(url:str):
                   tag_name = ref[len('refs/tags/'):]
                   tags.append(tag_name)
 
-      print(tags)
-
-   repositories_data = {
-      'user_id':user_id,
-      'url': url,
-      'name':full_name,
-      'description': description
-   }
-
-   message = controlTable.creatingRecordTable(table_name='repositories', data=repositories_data)
-
-   for version in tags:
-
-      repositories_version_data = {
-         'repositories_id':message['id'],
-         'version':version
+      repositories_data = {
+         'user_id':user_id,
+         'url': url,
+         'repositories_name':full_name.replace('/','.'),
+         'description': description
       }
 
-      controlTable.creatingRecordTable(table_name='version', data=repositories_version_data)
+      message = controlTable.creatingRecordTable(table_name='repositories', data=repositories_data)
+
+      for version in tags:
+
+         repositories_version_data = {
+            'repositories_id':message['id'],
+            'version':version
+         }
+
+         controlTable.creatingRecordTable(table_name='version', data=repositories_version_data)
+
+      return {"message": "Репозиторий успешно записан"}
+   
+   return {"message": "Некорректная ссылка"}
 
    
 
@@ -370,6 +403,7 @@ async def repositoriesInfo(id):
       )
 
    return result
+
 
 ####################################################################################################
 
