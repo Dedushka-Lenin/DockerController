@@ -76,7 +76,7 @@ class ControlTable():
 ####################################################################################################
     
     # Функция создания записи
-    def creatingRecordTable(self, table_name, data):
+    def createRecordTable(self, table_name, data):
         """
         Получает записи из таблицы по заданным условиям.
         :param table_name: имя таблицы (строка)

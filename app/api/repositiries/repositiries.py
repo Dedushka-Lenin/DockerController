@@ -1,22 +1,26 @@
 import requests
 import subprocess
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
+
+from app.api.users import auxiliary_functions as users_functions
 
 ####################################################################################################
 
-def set_control_table(control_table, users):
+def set_control_table(control_table):
    global controlTable
-   global Users
    controlTable = control_table
-   Users = users
+
+   global usersFunctions
+   usersFunctions = users_functions
+   usersFunctions.set_control_table(controlTable)
 
 router = APIRouter()
 
 @router.post("/", status_code=200)                                                       # Добавление нового репозитоория
 async def repositoriesCreation(url:str, request: Request):
 
-   user_id = Users.get_info(request)['user_id']
+   user_id = usersFunctions.getUserInfo(request)['user_id']
 
    mes = controlTable.fetchRecordTable(
       table_name='repositories', 
@@ -69,7 +73,7 @@ async def repositoriesCreation(url:str, request: Request):
          'description': description
       }
 
-      message = controlTable.creatingRecordTable(table_name='repositories', data=repositories_data)
+      message = controlTable.createRecordTable(table_name='repositories', data=repositories_data)
 
       for version in tags:
 
@@ -78,18 +82,18 @@ async def repositoriesCreation(url:str, request: Request):
             'version':version
          }
 
-         controlTable.creatingRecordTable(table_name='version', data=repositories_version_data)
+         controlTable.createRecordTable(table_name='version', data=repositories_version_data)
 
       return {"message": "Репозиторий успешно записан"}
    
-   return {"message": "Некорректная ссылка"}
+   raise HTTPException(status_code=400, detail="Некорректная ссылка")
 
    
 
 @router.get("/", status_code=200)                                                        # Список репозиториев
 async def repositoriesList(request: Request):
 
-   user_id = Users.get_info(request)['user_id']
+   user_id = usersFunctions.getUserInfo(request)['user_id']
 
    result = controlTable.fetchRecordTable(
       table_name='repositories', 
@@ -103,8 +107,7 @@ async def repositoriesList(request: Request):
 @router.get("/{id}", status_code=200)                                                    # Вывод информации о репозитории
 async def repositoriesInfo(id, request: Request):
 
-      
-   user_id = Users.get_info(request)['user_id']
+   user_id = usersFunctions.getUserInfo(request)['user_id']
 
    result = controlTable.fetchRecordTable(
       table_name='repositories', 
@@ -113,5 +116,17 @@ async def repositoriesInfo(id, request: Request):
          'user_id':user_id
          }
       )
+   
+   vrs = controlTable.fetchRecordTable(
+      table_name='version', 
+      conditions={
+         'repositories_id':id,
+         }
+      )
+   
+   result[0]['version'] = vrs
+   
+   if result == []:
+      raise HTTPException(status_code=400, detail="Репозитория с таким id не существует")
 
    return result

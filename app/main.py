@@ -4,15 +4,15 @@ import sys
 
 from fastapi import FastAPI
 
-
 from app.control_db.control_db import ControlDB
 from app.control_db.control_table import ControlTable
 
-from app.core.config import *
+from app.core.config import DBNAME, USER, PASSWORD, HOST, PORT
 
 ####################################################################################################
 
 controlDB = ControlDB()
+
 connection, cursor = controlDB.connectDB(
                         connectConf={
                            'dbname': 'postgres',
@@ -39,8 +39,8 @@ connection, cursor = controlDB.connectDB(
                         autocommit=True
                      )
 
-controlTable = ControlTable(cursor)
 
+controlTable = ControlTable(cursor)
 
 controlTable.createTable(table_name="users", 
                         fields= [
@@ -110,20 +110,25 @@ signal.signal(signal.SIGINT, signal_handler)
 
 ####################################################################################################
 
-from app.api import users, containers, repositories
+from app.api.containers import containers
+from app.api.repositiries import repositiries
+from app.api.users import users
 
-users.set_control_table(controlTable)
-containers.set_control_table(controlTable, users)
-repositories.set_control_table(controlTable, users)
+Containers = containers
+Repositories = repositiries
+Users = users
+
+Containers.set_control_table(controlTable)
+Repositories.set_control_table(controlTable)
+Users.set_control_table(controlTable)
 
 app = FastAPI()
 
-app.include_router(users.router, tags=["users"])
-app.include_router(containers.router, prefix="/containers", tags=["containers"])
-app.include_router(repositories.router, prefix="/repositories", tags=["repositories"])
+app.include_router(Containers.router, prefix="/containers", tags=["containers"])
+app.include_router(Repositories.router, prefix="/repositories", tags=["repositories"])
+app.include_router(Users.router, tags=["users"])
 
 ####################################################################################################
-
 
 if __name__ == "__main__":
     uvicorn.run("main:app")
