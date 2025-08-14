@@ -1,5 +1,0 @@
-DBNAME="postgres"
-USER="Red-Soft"
-PASSWORD="vo{>lC^E$)c$F9–h"
-HOST="localhost"
-PORT="5432"

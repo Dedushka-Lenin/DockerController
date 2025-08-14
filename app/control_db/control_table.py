@@ -1,25 +1,27 @@
 from psycopg2 import sql
 
-class ControlTable():
+from typing import List
+from app.models.schemas import CreateTableConf
 
+class ControlTable():
     def __init__(self, cursor):
         self.cursor = cursor
 
-    # Функция создания таблицы
-    def createTable(self, table_name: str, fields: list):
+    def createTable(self, table_name: str, fields: List[CreateTableConf]):
         """
         Создает таблицу с указанными полями.
         :param table_name: имя таблицы (строка)
-        :param fields: список кортежей (name, dtype, constraints)
+        :param fields: список объектов CreateTableConf
         """
+
         # Формируем строку определения полей
         fields_str = sql.SQL(", ").join(
             sql.SQL("{} {} {}").format(
-                sql.Identifier(name),
-                sql.SQL(dtype),
-                sql.SQL(constraints or "")
+                sql.Identifier(field['name']),
+                sql.SQL(field['dtype']),
+                sql.SQL(field['constraints'])
             )
-            for name, dtype, constraints in fields
+            for field in fields
         )
 
         # Формируем полный запрос
