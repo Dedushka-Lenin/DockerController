@@ -52,7 +52,7 @@ class ControlTable():
         else:
             return {"exists": False, "message": "Таблица не найдена"}
         
-    # # Функция проверки наличия записи
+    # Функция проверки наличия записи
     def checkRecordExists(self, table_name, id):
         """
         Получает записи из таблицы по заданным условиям.
@@ -162,7 +162,7 @@ class ControlTable():
         """ 
 
         # Формируем условие WHERE, если есть
-
+        
         if conditions:
             condition_clauses = []
             values = []
