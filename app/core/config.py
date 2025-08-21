@@ -1,9 +1,11 @@
 # Параметры подключения к бд
-DBNAME="containersDB"
-USER="Red-Soft"
-PASSWORD="vo{>lC^E$)c$F9–h"
-HOST="localhost"
-PORT="5432"
+CONNECT_CONF = {
+'dbname': "containersDB",
+'user': "Red-Soft",
+'password': "vo{>lC^E$)c$F9–h",
+'host': "localhost",
+'port': "5432"
+}
 
 # Конфигурация секретного ключа и алгоритма для JWT
 SECRET_KEY = "goida"

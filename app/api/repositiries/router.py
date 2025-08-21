@@ -3,15 +3,18 @@ import subprocess
 
 from fastapi import APIRouter, HTTPException, Request
 
-from app.api.users.auxiliary_functions import UserFctions
-from app.control_db.control_table import ControlTable
+from app.api.repositiries.repositoriesRepo import RepositoriesRepo
+from app.api.repositiries.versionRepo import VersionRepo
+from app.api.users.userRepo import UserRepo
 
 ####################################################################################################
 
 class RepositoriesRouter():
-   def __init__(self, cursor):
-      self.controlTable = ControlTable(cursor)
-      self.userFctions = UserFctions(cursor)
+   def __init__(self):
+
+      self.repositoriesRepo = RepositoriesRepo()
+      self.versionRepo = VersionRepo
+      self.userRepo = UserRepo()
 
       self.router = APIRouter()
 
@@ -22,10 +25,9 @@ class RepositoriesRouter():
    # Добавление нового репозитоория
    async def repositoriesCreation(self, url:str, request: Request):
 
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
 
-      mes = self.controlTable.fetchRecordTable(
-         table_name='repositories', 
+      mes = self.repositoriesRepo.get(
          conditions={
             'user_id':user_id,
             'url':url
@@ -48,7 +50,6 @@ class RepositoriesRouter():
          description = data.get('description', 'Нет описания')
          full_name = data.get('full_name', '')
       
-         # Выполняем команду для получения тегов по URL
          result = subprocess.run(
             ['git', 'ls-remote', '--tags', url],
             capture_output=True,
@@ -63,7 +64,7 @@ class RepositoriesRouter():
             parts = line.split()
             if len(parts) == 2:
                   ref = parts[1]
-                  # ref выглядит как refs/tags/v1.0.0
+
                   if ref.startswith('refs/tags/'):
                      tag_name = ref[len('refs/tags/'):]
                      tags.append(tag_name)
@@ -75,7 +76,7 @@ class RepositoriesRouter():
             'description': description
          }
 
-         message = self.controlTable.createRecordTable(table_name='repositories', data=repositories_data)
+         message = self.repositoriesRepo.create(data=repositories_data)
 
          for version in tags:
 
@@ -84,21 +85,20 @@ class RepositoriesRouter():
                'version':version
             }
 
-            self.controlTable.createRecordTable(table_name='version', data=repositories_version_data)
+            self.versionRepo.create(data=repositories_version_data)
 
          return {"message": "Репозиторий успешно записан"}
       
       raise HTTPException(status_code=400, detail="Некорректная ссылка")
 
-   # Функция вывода списка репозиторие
+
    async def repositoriesList(self, request: Request):
 
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
 
       print(user_id)
 
-      result = self.controlTable.fetchRecordTable(
-         table_name='repositories', 
+      result = self.repositoriesRepo.get(
          conditions={
             'user_id':user_id
             }
@@ -106,13 +106,12 @@ class RepositoriesRouter():
 
       return result
 
-   # Функция вывода информации о репозитории
+
    async def repositoriesInfo(self, id, request: Request):
 
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
 
-      result = self.controlTable.fetchRecordTable(
-         table_name='repositories', 
+      result = self.repositoriesRepo.get(
          conditions={
             'id':id,
             'user_id':user_id

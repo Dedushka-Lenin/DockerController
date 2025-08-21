@@ -1,35 +1,38 @@
 import os
+import docker
 
 from git import Repo
 
-from app.control_db.control_table import ControlTable
+from app.db.recordManager import RecordManager
 
-class ContainersFunctions():
-    def __init__(self, cursor, client):
-        self.controlTable = ControlTable(cursor)
-        self.client = client
 
-    def сheckingContainer(self, filtr, user_id):
+class ContainersRepo(RecordManager):
+    def __init__(self):
+            super().__init__('containers')
+            self.client = docker.from_env()
 
-        mes = self.controlTable.fetchRecordTable(
-            table_name='containers',
+
+    def check(self, filtr, user_id):
+
+        if not super().check(conditions={**{'user_id': user_id,}, **filtr}): 
+            return False
+
+        containers = super().get(
             conditions={**{
                         'user_id': user_id,
             }, **filtr}
         )
-
-        if mes == []:
-            return False
         
         containers_list = self.client.containers.list(all=True)
-        container_exists = any(container.name == mes[0]["containers_name"] for container in containers_list)
+        container_exists = any(container.name == containers[0]["containers_name"] for container in containers_list)
 
         if container_exists:
             return True
 
         return False
 
-    def cloneContainer(self, repo_url, version, base_dir, image_name, container_name):
+
+    def clone(self, repo_url, version, base_dir, image_name, container_name):
 
         if not os.path.exists(base_dir):
             if version == '':

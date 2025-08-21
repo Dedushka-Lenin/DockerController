@@ -5,17 +5,11 @@ from fastapi.responses import JSONResponse
 
 from app.models.schemas import Containers
 
-from app.api.users.auxiliary_functions import UserFctions
-from app.api.containers.auxiliary_functions import ContainersFunctions
-from app.control_db.control_table import ControlTable
 
 
 class ContainersRouter():
-   def __init__(self, cursor):
+   def __init__(self):
       self.client = docker.from_env()
-      self.controlTable = ControlTable(cursor)
-      self.userFctions = UserFctions(cursor)
-      self.containersFunctions = ContainersFunctions(cursor, self.client)
 
       self.router = APIRouter()
 
@@ -91,6 +85,7 @@ class ContainersRouter():
    # Запуск контейнера                                              
    async def containersStart(self, id, request: Request):
       user_id = self.userFctions.getUserInfo(request)['user_id']
+      
       if not self.containersFunctions.сheckingContainer({'id':id}, user_id):
          raise HTTPException(status_code=400, detail='Контейнер не существует')
       

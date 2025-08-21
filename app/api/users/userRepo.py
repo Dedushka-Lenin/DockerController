@@ -1,18 +1,15 @@
 import jwt
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 
-
-from app.control_db.control_table import ControlTable
+from app.db.recordManager import RecordManager
 from app.core.config import SECRET_KEY, ALGORITHM
 
+class UserRepo(RecordManager):
+    def __init__(self):
+        super().__init__('users')
 
-class UserFctions():
-    def __init__(self, cursor):
-        self.controlTable = ControlTable(cursor)
-
-    # Функция получения информации о пользователе
-    def getUserInfo(self, request: Request):
+    def getInfo(self, request):
 
         token = request.cookies.get("access_token")
 
@@ -27,16 +24,15 @@ class UserFctions():
         except jwt.ExpiredSignatureError:
             raise HTTPException(status_code=401, detail="Токен просрочен")
         except jwt.PyJWTError:
-            raise HTTPException(status_code=401, detail="Неверный токе")
+            raise HTTPException(status_code=401, detail="Неверный токен")
 
-        # Получение данных пользователя из базы
-        res = self.controlTable.fetchRecordTable(
-            table_name='users',
+
+        if not super().check(conditions={'login': login}):
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        res = super().get(
             conditions={'login': login}
         )
-
-        if not res:
-            raise HTTPException(status_code=404, detail="Пользователь не найден")
 
         return {
             "user_id": res[0]['id'],
