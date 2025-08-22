@@ -23,7 +23,7 @@ class UserRouter():
 
 
    async def register(self, user: User):
-      if not self.userRepo.check(conditions={'login': user.login}):
+      if self.userRepo.check(conditions={'login': user.login}):
          raise HTTPException(status_code=400, detail="Пользователь с таким именем уже существует")
 
       hashed_password = self.pw_context.hash(user.password)
@@ -39,7 +39,7 @@ class UserRouter():
 
 
    async def login(self, response: Response, user: User):
-      if self.userRepo.check(conditions={'login': user.login}):
+      if not self.userRepo.check(conditions={'login': user.login}):
          raise HTTPException(status_code=400, detail="Неверные имя или пароль")
       
       res = self.userRepo.get(

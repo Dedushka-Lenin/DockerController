@@ -22,7 +22,7 @@ class RepositoriesRouter():
       self.router.get("/", status_code=200) (self.repositoriesList)
       self.router.get("/{id}", status_code=200) (self.repositoriesInfo)
 
-   # Добавление нового репозитоория
+
    async def repositoriesCreation(self, url:str, request: Request):
 
       user_id = self.userRepo.getInfo(request)['user_id']
@@ -95,8 +95,6 @@ class RepositoriesRouter():
    async def repositoriesList(self, request: Request):
 
       user_id = self.userRepo.getInfo(request)['user_id']
-
-      print(user_id)
 
       result = self.repositoriesRepo.get(
          conditions={

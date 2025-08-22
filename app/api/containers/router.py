@@ -5,11 +5,20 @@ from fastapi.responses import JSONResponse
 
 from app.models.schemas import Containers
 
+from app.api.containers.containersRepo import ContainersRepo
+from app.api.repositiries.repositoriesRepo import RepositoriesRepo
+from app.api.repositiries.versionRepo import VersionRepo
+from app.api.users.userRepo import UserRepo
 
 
 class ContainersRouter():
    def __init__(self):
       self.client = docker.from_env()
+
+      self.containersRepo = ContainersRepo()
+      self.repositoriesRepo = RepositoriesRepo()
+      self.versionRepo = VersionRepo()
+      self.userRepo = UserRepo()
 
       self.router = APIRouter()
 
@@ -22,13 +31,11 @@ class ContainersRouter():
       self.router.get("/{id}", status_code=200)(self.containersInfo)
 
 
-   # Создание нового контейнера из репозитория
    async def containersCreation(self, data: Containers, request: Request):
       
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
 
-      repo_info = self.controlTable.fetchRecordTable(
-         table_name='repositories',
+      repo_info = self.repositoriesRepo.get(
          conditions={'id': data.repositories_id}
       )
 
@@ -46,12 +53,11 @@ class ContainersRouter():
          container_name = f'{user_id}.{repo_name}'
 
       else:
-         mes = self.controlTable.fetchRecordTable(
-         table_name='version', 
-         conditions={
-            'version':data.version,
-            'repositories_id':data.repositories_id
-            }
+         mes = self.versionRepo.get(
+            conditions={
+               'version':data.version,
+               'repositories_id':data.repositories_id
+               }
          )
          
          if mes == []:
@@ -63,11 +69,11 @@ class ContainersRouter():
             container_name = f'{user_id}.{repo_name}.{data.version}'
 
 
-      if self.containersFunctions.сheckingContainer({'containers_name':container_name}, user_id):
+      if self.containersRepo.check({'containers_name':container_name}, user_id):
          raise HTTPException(status_code=400, detail='Контейнер уже существует')
 
 
-      container = self.containersFunctions.cloneContainer(repo_url, data.version, base_dir, image_name, container_name)
+      container = self.containersRepo.clone(repo_url, data.version, base_dir, image_name, container_name)
 
       info = container.attrs
 
@@ -78,19 +84,18 @@ class ContainersRouter():
          'version': data.version
       }
       
-      self.controlTable.createRecordTable(table_name='containers', data=repositories_data)
+      self.containersRepo.create(data=repositories_data)
 
       return {"message": f"Контейнер {info} успешно запущен"}
 
-   # Запуск контейнера                                              
+                                        
    async def containersStart(self, id, request: Request):
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
       
-      if not self.containersFunctions.сheckingContainer({'id':id}, user_id):
+      if not self.containersRepo.check({'id':id}, user_id):
          raise HTTPException(status_code=400, detail='Контейнер не существует')
       
-      res = self.controlTable.fetchRecordTable(
-            table_name='containers',
+      res = self.containersRepo.get(
             conditions={'id':id,
                         'user_id': user_id,
             }
@@ -101,16 +106,15 @@ class ContainersRouter():
 
       return {"message": "Контейнер успешно запущен"}
 
-   # Остановка контейнера                                              
+                                           
    async def containersStop(self, id, request: Request):
 
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
 
-      if not self.containersFunctions.сheckingContainer({'id':id}, user_id):
+      if not self.containersRepo.check({'id':id}, user_id):
          raise HTTPException(status_code=400, detail='Контейнер не существует')
       
-      res = self.controlTable.fetchRecordTable(
-            table_name='containers',
+      res = self.containersRepo.get(
             conditions={'id':id,
                         'user_id': user_id,
             }
@@ -121,16 +125,15 @@ class ContainersRouter():
 
       return {"message": "Контейнер успешно остановлен"}
 
-   # Перезапуск контейнера                                         
+
    async def containersRestart(self, id, request: Request):
 
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
 
-      if not self.containersFunctions.сheckingContainer({'id':id}, user_id):
+      if not self.containersRepo.check({'id':id}, user_id):
          raise HTTPException(status_code=400, detail='Контейнер не существует')
       
-      res = self.controlTable.fetchRecordTable(
-            table_name='containers',
+      res = self.containersRepo.get(
             conditions={'id':id,
                         'user_id': user_id,
             }
@@ -141,16 +144,15 @@ class ContainersRouter():
 
       return {"message": "Контейнер успешно перезапущен"}
 
-   # Удаление котейнера                                                 
+                                           
    async def containersDelete(self, request: Request, id):
 
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
 
-      if not self.containersFunctions.сheckingContainer({'id':id}, user_id):
+      if not self.containersRepo.check({'id':id}, user_id):
          raise HTTPException(status_code=400, detail='Контейнер не существует')
       
-      res = self.controlTable.fetchRecordTable(
-            table_name='containers',
+      res = self.containersRepo.get(
             conditions={'id':id,
                         'user_id': user_id,
             }
@@ -160,31 +162,29 @@ class ContainersRouter():
       container.stop()
       container.remove()
 
-      self.controlTable.deleteRecordTable(table_name='containers', id=id)
+      self.containersRepo.delete(id=id)
 
       return {"message": "Контейнер успешно удален"}
 
-   # Получение списка контейнеров                                                     
+                                               
    async def containersList(self, request: Request):
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
 
-      mes = self.controlTable.fetchRecordTable(
-         table_name='containers',
+      mes = self.containersRepo.get(
          conditions={'user_id': user_id}
       )
          
       return JSONResponse(mes)
 
-   # Получение информации о контейнере                                                   
+                                                
    async def containersInfo(self, id, request: Request):
 
-      user_id = self.userFctions.getUserInfo(request)['user_id']
+      user_id = self.userRepo.getInfo(request)['user_id']
 
-      if not self.containersFunctions.сheckingContainer({'id':id}, user_id):
+      if not self.containersRepo.check({'id':id}, user_id):
          raise HTTPException(status_code=400, detail='Контейнер не существует')
       
-      res = self.controlTable.fetchRecordTable(
-            table_name='containers',
+      res = self.containersRepo.get(
             conditions={'id':id,
                         'user_id': user_id,
             }
