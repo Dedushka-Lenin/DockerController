@@ -3,9 +3,10 @@ from psycopg2 import sql
 from app.db.dbConnector import DbConnector
 
 
-class RecordManager(DbConnector):
+
+class RecordManager():
     def __init__(self, table_name):
-        super().__init__()
+        self.cursor = DbConnector().get_cursor()
 
         self.table_name = table_name
     
@@ -55,10 +56,8 @@ class RecordManager(DbConnector):
             condition=sql.SQL(id)
         )
 
-
         values = list(update_fields.values())
 
-        # Выполняем запрос
         self.cursor.execute(query, values)
 
 
