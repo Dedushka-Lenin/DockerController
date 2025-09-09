@@ -1,6 +1,6 @@
 from psycopg2 import sql
 
-from app.db.dbConnector import DbConnector
+from app.db.db_connector import DbConnector
 
 
 

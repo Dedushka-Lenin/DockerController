@@ -3,7 +3,7 @@ import docker
 
 from git import Repo
 
-from app.db.recordManager import RecordManager
+from app.db.record_manager import RecordManager
 
 
 class ContainersRepo(RecordManager):

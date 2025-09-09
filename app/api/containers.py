@@ -5,10 +5,10 @@ from fastapi.responses import JSONResponse
 
 from app.models.schemas import Containers
 
-from app.api.containers.containersRepo import ContainersRepo
-from app.api.repositiries.repositoriesRepo import RepositoriesRepo
-from app.api.repositiries.versionRepo import VersionRepo
-from app.api.users.userRepo import UserRepo
+from app.repo.containers_repo import ContainersRepo
+from app.repo.repositories_repo import RepositoriesRepo
+from app.repo.version_repo import VersionRepo
+from app.repo.users_repo import UserRepo
 
 
 class ContainersRouter():

@@ -2,9 +2,9 @@ import uvicorn
 
 from fastapi import FastAPI
 
-from app.api.containers.router import ContainersRouter
-from app.api.repositiries.router import RepositoriesRouter
-from app.api.users.router import UserRouter
+from app.api.containers import ContainersRouter
+from app.api.repositories import RepositoriesRouter
+from app.api.users import UserRouter
 
 
 

@@ -2,7 +2,7 @@ import jwt
 
 from fastapi import HTTPException
 
-from app.db.recordManager import RecordManager
+from app.db.record_manager import RecordManager
 from app.core.config import SECRET_KEY, ALGORITHM
 
 class UserRepo(RecordManager):

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Response, Request
 
 from app.models.schemas import User
-from app.api.users.userRepo import UserRepo
+from app.repo.users_repo import UserRepo
 from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, ALGORITHM
 
 
