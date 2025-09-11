@@ -1,18 +1,20 @@
 import jwt
+from dynaconf import Dynaconf
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Response, Request
 
 from app.models.schemas import User
 from app.repo.users_repo import UserRepo
-from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, ALGORITHM
 
 
 class UserRouter:
-    def __init__(self):
+    # TODO:
 
+    def __init__(self):
         self.userRepo = UserRepo()
 
+        self.settings = Dynaconf(settings_files=["jwt_conf.toml"])
         self.pw_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
         self.router = APIRouter()
@@ -44,15 +46,19 @@ class UserRouter:
         if not self.pw_context.verify(user.password, user_hashed_pw):
             raise HTTPException(status_code=400, detail="Неверные имя или пароль")
 
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + timedelta(
+            minutes=self.settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
         to_encode = {"sub": user.login, "exp": expire}
-        token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        token = jwt.encode(
+            to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
+        )
 
         response.set_cookie(
             key="access_token",
             value=token,
             httponly=True,
-            max_age=60 * ACCESS_TOKEN_EXPIRE_MINUTES,
+            max_age=60 * self.settings.ACCESS_TOKEN_EXPIRE_MINUTES,
             samesite="lax",
         )
 

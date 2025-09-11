@@ -73,7 +73,7 @@ class ContainersRouter:
     async def start(self, id: int, request: Request):
         user_id = self.userRepo.get(request)["id"]
 
-        container_data = self._get_container_by_id(id, user_id)
+        container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         container.start()
 
@@ -82,7 +82,7 @@ class ContainersRouter:
     async def stop(self, id: int, request: Request):
         user_id = self.userRepo.get(request)["id"]
 
-        container_data = self._get_container_by_id(id, user_id)
+        container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         container.stop()
 
@@ -91,7 +91,7 @@ class ContainersRouter:
     async def restart(self, id: int, request: Request):
         user_id = self.userRepo.get(request)["id"]
 
-        container_data = self._get_container_by_id(id, user_id)
+        container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         container.restart()
 
@@ -100,7 +100,7 @@ class ContainersRouter:
     async def delete(self, id: int, request: Request):
         user_id = self.userRepo.get(request)["id"]
 
-        container_data = self._get_container_by_id(id, user_id)
+        container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         container.stop()
         container.remove()
@@ -118,7 +118,7 @@ class ContainersRouter:
 
     async def info(self, id: int, request: Request):
         user_id = self.userRepo.get(request)["id"]
-        container_data = self._get_container_by_id(id, user_id)
+        container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         info = container.attrs
 

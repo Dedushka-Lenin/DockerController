@@ -7,8 +7,6 @@ from app.repo.repositories_repo import RepositoriesRepo
 from app.repo.version_repo import VersionRepo
 from app.repo.users_repo import UserRepo
 
-####################################################################################################
-
 
 class RepositoriesRouter:
     def __init__(self):
@@ -25,7 +23,7 @@ class RepositoriesRouter:
 
     async def creat(self, url: str, request: Request):
 
-        user_id = self.userRepo.getInfo(request)["user_id"]
+        user_id = self.userRepo.get(request)["user_id"]
 
         mes = self.repositoriesRepo.get(conditions={"user_id": user_id, "url": url})
 
@@ -88,7 +86,7 @@ class RepositoriesRouter:
 
     async def get(self, request: Request):
 
-        user_id = self.userRepo.getInfo(request)["user_id"]
+        user_id = self.userRepo.get(request)["user_id"]
 
         result = self.repositoriesRepo.get(conditions={"user_id": user_id})
 

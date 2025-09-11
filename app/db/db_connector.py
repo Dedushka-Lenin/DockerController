@@ -3,8 +3,7 @@ import sys
 
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-
-from app.core.config import CONNECT_CONF
+from dynaconf import Dynaconf
 
 
 class DbConnector:
@@ -18,12 +17,14 @@ class DbConnector:
 
     def get_cursor(self):
         if not self._cursor:
-            self.connect()
+            connect_conf = Dynaconf(settings_files=["connect_conf.toml"])
+
+            self.connect(connect_conf)
             self._initialized = True
 
         return self._cursor
 
-    def connect(self, connect_conf=CONNECT_CONF):
+    def connect(self, connect_conf):
 
         self.connection = psycopg2.connect(
             dbname=connect_conf["dbname"],

@@ -1,14 +1,17 @@
 import jwt
 
+from dynaconf import Dynaconf
+
 from fastapi import HTTPException
 
 from app.db.record_manager import RecordManager
-from app.core.config import SECRET_KEY, ALGORITHM
 
 
 class UserRepo(RecordManager):
     def __init__(self):
         super().__init__("users")
+
+        self.settings = Dynaconf(settings_files=["jwt_conf.toml"])
 
     def get(self, request):
 
@@ -18,7 +21,9 @@ class UserRepo(RecordManager):
             raise HTTPException(status_code=401, detail="Нет аунтификации")
 
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(
+                token, self.settings.SECRET_KEY, algorithms=[self.settings.ALGORITHM]
+            )
             login = payload.get("sub")
             if login is None:
                 raise HTTPException(status_code=401, detail="Неверный токен")
