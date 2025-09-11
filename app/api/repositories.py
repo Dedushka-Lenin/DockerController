@@ -9,114 +9,100 @@ from app.repo.users_repo import UserRepo
 
 ####################################################################################################
 
-class RepositoriesRouter():
-   def __init__(self):
 
-      self.repositoriesRepo = RepositoriesRepo()
-      self.versionRepo = VersionRepo
-      self.userRepo = UserRepo()
+class RepositoriesRouter:
+    def __init__(self):
 
-      self.router = APIRouter()
+        self.repositoriesRepo = RepositoriesRepo()
+        self.versionRepo = VersionRepo
+        self.userRepo = UserRepo()
 
-      self.router.post("/", status_code=200) (self.repositoriesCreation)
-      self.router.get("/", status_code=200) (self.repositoriesList)
-      self.router.get("/{id}", status_code=200) (self.repositoriesInfo)
+        self.router = APIRouter()
 
+        self.router.post("/", status_code=200)(self.creat)
+        self.router.get("/", status_code=200)(self.get)
+        self.router.get("/{id}", status_code=200)(self.info)
 
-   async def repositoriesCreation(self, url:str, request: Request):
+    async def creat(self, url: str, request: Request):
 
-      user_id = self.userRepo.getInfo(request)['user_id']
+        user_id = self.userRepo.getInfo(request)["user_id"]
 
-      mes = self.repositoriesRepo.get(
-         conditions={
-            'user_id':user_id,
-            'url':url
-            }
-         )
-      
-      if mes != []:
-         return {"message": "Репозиторий уже существует"}
+        mes = self.repositoriesRepo.get(conditions={"user_id": user_id, "url": url})
 
-      parts = url.rstrip('/').split('/')
-      owner = parts[-2]
-      repo = parts[-1]
+        if mes != []:
+            return {"message": "Репозиторий уже существует"}
 
-      api_url = f"https://api.github.com/repos/{owner}/{repo}"
+        parts = url.rstrip("/").split("/")
+        owner = parts[-2]
+        repo = parts[-1]
 
-      response = requests.get(api_url)
-      if response.status_code == 200:
-         data = response.json()
+        api_url = f"https://api.github.com/repos/{owner}/{repo}"
 
-         description = data.get('description', 'Нет описания')
-         full_name = data.get('full_name', '')
-      
-         result = subprocess.run(
-            ['git', 'ls-remote', '--tags', url],
-            capture_output=True,
-            text=True,
-            check=True
-         )
+        response = requests.get(api_url)
+        if response.status_code == 200:
+            data = response.json()
 
-         lines = result.stdout.strip().split('\n')
-         tags = []
+            description = data.get("description", "Нет описания")
+            full_name = data.get("full_name", "")
 
-         for line in lines:
-            parts = line.split()
-            if len(parts) == 2:
-                  ref = parts[1]
+            result = subprocess.run(
+                ["git", "ls-remote", "--tags", url],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
 
-                  if ref.startswith('refs/tags/'):
-                     tag_name = ref[len('refs/tags/'):]
-                     tags.append(tag_name)
+            lines = result.stdout.strip().split("\n")
+            tags = []
 
-         repositories_data = {
-            'user_id':user_id,
-            'url': url,
-            'repositories_name':full_name.replace('/','.'),
-            'description': description
-         }
+            for line in lines:
+                parts = line.split()
+                if len(parts) == 2:
+                    ref = parts[1]
 
-         message = self.repositoriesRepo.create(data=repositories_data)
+                    if ref.startswith("refs/tags/"):
+                        tag_name = ref[len("refs/tags/") :]
+                        tags.append(tag_name)
 
-         for version in tags:
-
-            repositories_version_data = {
-               'repositories_id':message['id'],
-               'version':version
+            repositories_data = {
+                "user_id": user_id,
+                "url": url,
+                "repositories_name": full_name.replace("/", "."),
+                "description": description,
             }
 
-            self.versionRepo.create(data=repositories_version_data)
+            message = self.repositoriesRepo.create(data=repositories_data)
 
-         return {"message": "Репозиторий успешно записан"}
-      
-      raise HTTPException(status_code=400, detail="Некорректная ссылка")
+            for version in tags:
 
+                repositories_version_data = {
+                    "repositories_id": message["id"],
+                    "version": version,
+                }
 
-   async def repositoriesList(self, request: Request):
+                self.versionRepo.create(data=repositories_version_data)
 
-      user_id = self.userRepo.getInfo(request)['user_id']
+            return {"message": "Репозиторий успешно записан"}
 
-      result = self.repositoriesRepo.get(
-         conditions={
-            'user_id':user_id
-            }
-         )
+        raise HTTPException(status_code=400, detail="Некорректная ссылка")
 
-      return result
+    async def get(self, request: Request):
 
+        user_id = self.userRepo.getInfo(request)["user_id"]
 
-   async def repositoriesInfo(self, id, request: Request):
+        result = self.repositoriesRepo.get(conditions={"user_id": user_id})
 
-      user_id = self.userRepo.getInfo(request)['user_id']
+        return result
 
-      result = self.repositoriesRepo.get(
-         conditions={
-            'id':id,
-            'user_id':user_id
-            }
-         )
-      
-      if result == []:
-         raise HTTPException(status_code=400, detail="Репозитория с таким id не существует")
+    async def info(self, id, request: Request):
 
-      return result
+        user_id = self.userRepo.get(request)["user_id"]
+
+        result = self.repositoriesRepo.check(conditions={"id": id, "user_id": user_id})
+
+        if not result:
+            raise HTTPException(
+                status_code=400, detail="Репозитория с таким id не существует"
+            )
+
+        return result

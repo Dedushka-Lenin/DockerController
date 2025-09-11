@@ -4,193 +4,122 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.models.schemas import Containers
-
 from app.repo.containers_repo import ContainersRepo
 from app.repo.repositories_repo import RepositoriesRepo
 from app.repo.version_repo import VersionRepo
 from app.repo.users_repo import UserRepo
 
 
-class ContainersRouter():
-   def __init__(self):
-      self.client = docker.from_env()
+class ContainersRouter:
+    def __init__(self):
+        self.client = docker.from_env()
 
-      self.containersRepo = ContainersRepo()
-      self.repositoriesRepo = RepositoriesRepo()
-      self.versionRepo = VersionRepo()
-      self.userRepo = UserRepo()
+        self.containersRepo = ContainersRepo()
+        self.repositoriesRepo = RepositoriesRepo()
+        self.versionRepo = VersionRepo()
+        self.userRepo = UserRepo()
 
-      self.router = APIRouter()
+        self.router = APIRouter()
+        self.router.post("/", status_code=200)(self.create)
+        self.router.post("/{id}/start", status_code=200)(self.start)
+        self.router.post("/{id}/stop", status_code=200)(self.stop)
+        self.router.post("/{id}/restart", status_code=200)(self.restart)
+        self.router.delete("/{id}", status_code=200)(self.delete)
+        self.router.get("/", status_code=200)(self.get)
+        self.router.get("/{id}", status_code=200)(self.info)
 
-      self.router.post("/", status_code=200)(self.containersCreation)
-      self.router.post("/{id}/start", status_code=200)(self.containersStart)
-      self.router.post("/{id}/stop", status_code=200)(self.containersStop)
-      self.router.post("/{id}/restart", status_code=200) (self.containersRestart)
-      self.router.delete("/{id}", status_code=200)(self.containersDelete)
-      self.router.get("/", status_code=200)(self.containersList)
-      self.router.get("/{id}", status_code=200)(self.containersInfo)
+    async def create(self, data: Containers, request: Request):
+        user_id = self.userRepo.get(request)["id"]
 
+        repo_info = self.repositoriesRepo.get(data.repositories_id)
+        repo_url = repo_info["url"]
+        repo_name = repo_info["repositories_name"]
 
-   async def containersCreation(self, data: Containers, request: Request):
-      
-      user_id = self.userRepo.getInfo(request)['user_id']
+        if data.version == "":
+            base_dir = f"./repo/{repo_name}"
+            image_name = repo_name
+            container_name = f"{user_id}.{repo_name}"
+        else:
+            mes = self.versionRepo.get(
+                conditions={
+                    "version": data.version,
+                    "repositories_id": data.repositories_id,
+                }
+            )
+            if not mes:
+                raise HTTPException(status_code=400, detail="Несуществующая версия")
+            base_dir = f"./repo/{repo_name}/{data.version}"
+            image_name = f"{repo_name}:{data.version}"
+            container_name = f"{user_id}.{repo_name}.{data.version}"
 
-      repo_info = self.repositoriesRepo.get(
-         conditions={'id': data.repositories_id}
-      )
+        if self.containersRepo.check({"containers_name": container_name}, user_id):
+            raise HTTPException(status_code=400, detail="Контейнер уже существует")
 
-      if repo_info == []:
-         raise HTTPException(status_code=401, detail=f'id - {data.repositories_id} не существует')
+        self.containersRepo.clone(repo_url, base_dir, data.version)
 
-      repo_info = repo_info[0]
-      repo_url = repo_info['url']
-      repo_name = repo_info['repositories_name']
+        container = self.containersRepo.build(base_dir, image_name, container_name)
+        info = container.attrs
 
+        repositories_data = {
+            "user_id": user_id,
+            "containers_name": container_name,
+            "repositories_id": data.repositories_id,
+            "version": data.version,
+        }
+        self.containersRepo.create(data=repositories_data)
 
-      if data.version == '':
-         base_dir = f'./repo/{repo_name}'
-         image_name = f'{repo_name}'
-         container_name = f'{user_id}.{repo_name}'
+        return {"message": f"Контейнер {info} успешно запущен"}
 
-      else:
-         mes = self.versionRepo.get(
-            conditions={
-               'version':data.version,
-               'repositories_id':data.repositories_id
-               }
-         )
-         
-         if mes == []:
-            raise HTTPException(status_code=400, detail='Несуществующая версия')
-         
-         else:
-            base_dir = f'./repo/{repo_name}/{data.version}'
-            image_name = f'{repo_name}:{data.version}'
-            container_name = f'{user_id}.{repo_name}.{data.version}'
+    async def start(self, id: int, request: Request):
+        user_id = self.userRepo.get(request)["id"]
 
+        container_data = self._get_container_by_id(id, user_id)
+        container = self.client.containers.get(container_data["containers_name"])
+        container.start()
 
-      if self.containersRepo.check({'containers_name':container_name}, user_id):
-         raise HTTPException(status_code=400, detail='Контейнер уже существует')
+        return {"message": "Контейнер успешно запущен"}
 
+    async def stop(self, id: int, request: Request):
+        user_id = self.userRepo.get(request)["id"]
 
-      container = self.containersRepo.clone(repo_url, data.version, base_dir, image_name, container_name)
+        container_data = self._get_container_by_id(id, user_id)
+        container = self.client.containers.get(container_data["containers_name"])
+        container.stop()
 
-      info = container.attrs
+        return {"message": "Контейнер успешно остановлен"}
 
-      repositories_data = {
-         'user_id': user_id,
-         'containers_name': container_name,
-         'repositories_id': data.repositories_id,
-         'version': data.version
-      }
-      
-      self.containersRepo.create(data=repositories_data)
+    async def restart(self, id: int, request: Request):
+        user_id = self.userRepo.get(request)["id"]
 
-      return {"message": f"Контейнер {info} успешно запущен"}
+        container_data = self._get_container_by_id(id, user_id)
+        container = self.client.containers.get(container_data["containers_name"])
+        container.restart()
 
-                                        
-   async def containersStart(self, id, request: Request):
-      user_id = self.userRepo.getInfo(request)['user_id']
-      
-      if not self.containersRepo.check({'id':id}, user_id):
-         raise HTTPException(status_code=400, detail='Контейнер не существует')
-      
-      res = self.containersRepo.get(
-            conditions={'id':id,
-                        'user_id': user_id,
-            }
-      )
-      
-      container = self.client.containers.get(res[0]['containers_name'])
-      container.start
+        return {"message": "Контейнер успешно перезапущен"}
 
-      return {"message": "Контейнер успешно запущен"}
+    async def delete(self, id: int, request: Request):
+        user_id = self.userRepo.get(request)["id"]
 
-                                           
-   async def containersStop(self, id, request: Request):
+        container_data = self._get_container_by_id(id, user_id)
+        container = self.client.containers.get(container_data["containers_name"])
+        container.stop()
+        container.remove()
 
-      user_id = self.userRepo.getInfo(request)['user_id']
+        self.containersRepo.delete(id=id)
 
-      if not self.containersRepo.check({'id':id}, user_id):
-         raise HTTPException(status_code=400, detail='Контейнер не существует')
-      
-      res = self.containersRepo.get(
-            conditions={'id':id,
-                        'user_id': user_id,
-            }
-      )
-      
-      container = self.client.containers.get(res[0]['containers_name'])
-      container.stop()
+        return {"message": "Контейнер успешно удален"}
 
-      return {"message": "Контейнер успешно остановлен"}
+    async def get(self, request: Request):
+        user_id = self.userRepo.get(request)["id"]
 
+        containers = self.containersRepo.get(conditions={"user_id": user_id})
 
-   async def containersRestart(self, id, request: Request):
+        return JSONResponse(containers)
 
-      user_id = self.userRepo.getInfo(request)['user_id']
+    async def info(self, id: int, request: Request):
+        user_id = self.userRepo.get(request)["id"]
+        container_data = self._get_container_by_id(id, user_id)
+        container = self.client.containers.get(container_data["containers_name"])
+        info = container.attrs
 
-      if not self.containersRepo.check({'id':id}, user_id):
-         raise HTTPException(status_code=400, detail='Контейнер не существует')
-      
-      res = self.containersRepo.get(
-            conditions={'id':id,
-                        'user_id': user_id,
-            }
-      )
-      
-      container = self.client.containers.get(res[0]['containers_name'])
-      container.restart()
-
-      return {"message": "Контейнер успешно перезапущен"}
-
-                                           
-   async def containersDelete(self, request: Request, id):
-
-      user_id = self.userRepo.getInfo(request)['user_id']
-
-      if not self.containersRepo.check({'id':id}, user_id):
-         raise HTTPException(status_code=400, detail='Контейнер не существует')
-      
-      res = self.containersRepo.get(
-            conditions={'id':id,
-                        'user_id': user_id,
-            }
-      )
-      
-      container = self.client.containers.get(res[0]['containers_name'])
-      container.stop()
-      container.remove()
-
-      self.containersRepo.delete(id=id)
-
-      return {"message": "Контейнер успешно удален"}
-
-                                               
-   async def containersList(self, request: Request):
-      user_id = self.userRepo.getInfo(request)['user_id']
-
-      mes = self.containersRepo.get(
-         conditions={'user_id': user_id}
-      )
-         
-      return JSONResponse(mes)
-
-                                                
-   async def containersInfo(self, id, request: Request):
-
-      user_id = self.userRepo.getInfo(request)['user_id']
-
-      if not self.containersRepo.check({'id':id}, user_id):
-         raise HTTPException(status_code=400, detail='Контейнер не существует')
-      
-      res = self.containersRepo.get(
-            conditions={'id':id,
-                        'user_id': user_id,
-            }
-      )
-      
-      container = self.client.containers.get(res[0]['containers_name'])
-      info = container.attrs
-
-      return JSONResponse(info)
+        return JSONResponse(info)

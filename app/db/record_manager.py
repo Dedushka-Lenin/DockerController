@@ -3,13 +3,12 @@ from psycopg2 import sql
 from app.db.db_connector import DbConnector
 
 
-
-class RecordManager():
+class RecordManager:
     def __init__(self, table_name):
         self.cursor = DbConnector().get_cursor()
 
         self.table_name = table_name
-    
+
     def check(self, conditions):
         columns = conditions.keys()
         values = [conditions[column] for column in columns]
@@ -17,13 +16,14 @@ class RecordManager():
         placeholders = ", ".join(["%s"] * len(values))
         columns_str = ", ".join(columns)
 
-        query = f"SELECT 1 FROM {self.table_name} WHERE ({columns_str}) = ({placeholders})"
+        query = (
+            f"SELECT 1 FROM {self.table_name} WHERE ({columns_str}) = ({placeholders})"
+        )
 
         self.cursor.execute(query, values)
         exists = self.cursor.fetchone() is not None
 
         return exists
-
 
     def create(self, data):
         columns = data.keys()
@@ -31,7 +31,7 @@ class RecordManager():
 
         placeholders = ", ".join(["%s"] * len(values))
         columns_str = ", ".join(columns)
-        
+
         query = f"INSERT INTO {self.table_name}({columns_str}) VALUES ({placeholders}) RETURNING id"
         self.cursor.execute(query, values)
 
@@ -39,27 +39,23 @@ class RecordManager():
 
         return id
 
-
     def delete(self, id):
         self.cursor.execute(f"DELETE FROM {self.table_name} WHERE id = %s", (id,))
-    
 
     def update(self, update_fields, id):
         set_clause = sql.SQL(", ").join(
             sql.SQL("{} = %s").format(sql.Identifier(k)) for k in update_fields.keys()
         )
 
-
         query = sql.SQL("UPDATE {table_name} SET {set_clause} WHERE id = {id}").format(
             table_name=sql.Identifier(self.table_name),
             set_clause=set_clause,
-            condition=sql.SQL(id)
+            condition=sql.SQL(id),
         )
 
         values = list(update_fields.values())
 
         self.cursor.execute(query, values)
-
 
     def get(self, conditions=None):
         if conditions:
