@@ -17,11 +17,11 @@ class RepositoriesRouter:
 
         self.router = APIRouter()
 
-        self.router.post("/", status_code=200)(self.creat)
+        self.router.post("/", status_code=200)(self.create)
         self.router.get("/", status_code=200)(self.get)
         self.router.get("/{id}", status_code=200)(self.info)
 
-    async def creat(self, url: str, request: Request):
+    async def create(self, url: str, request: Request):
 
         user_id = self.userRepo.get(request)["user_id"]
 

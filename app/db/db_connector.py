@@ -3,7 +3,8 @@ import sys
 
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from dynaconf import Dynaconf
+
+from app.adapters.conf.conf_adapter import ConfAdapter
 
 
 class DbConnector:
@@ -17,7 +18,8 @@ class DbConnector:
 
     def get_cursor(self):
         if not self._cursor:
-            connect_conf = Dynaconf(settings_files=["connect_conf.toml"])
+            confAdapter = ConfAdapter()
+            connect_conf = confAdapter.get_connect_conf()
 
             self.connect(connect_conf)
             self._initialized = True
@@ -27,11 +29,11 @@ class DbConnector:
     def connect(self, connect_conf):
 
         self.connection = psycopg2.connect(
-            dbname=connect_conf["dbname"],
-            user=connect_conf["user"],
-            password=connect_conf["password"],
-            host=connect_conf["host"],
-            port=connect_conf["port"],
+            dbname=connect_conf.DB_NAME,
+            user=connect_conf.USER,
+            password=connect_conf.PASSWORD,
+            host=connect_conf.HOST,
+            port=connect_conf.PORT,
         )
 
         self.connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)

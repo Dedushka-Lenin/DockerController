@@ -6,7 +6,6 @@ from git import Repo
 
 class DockerAdapter:
     def __init__(self):
-
         self.client = docker.from_env()
 
     def clone(self, repo_url: str, base_dir: str, version: str):
