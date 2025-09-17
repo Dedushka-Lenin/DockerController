@@ -1,9 +1,3 @@
-import jwt
-
-from dynaconf import Dynaconf
-
-from fastapi import HTTPException
-
 from app.db.record_manager import RecordManager
 
 
