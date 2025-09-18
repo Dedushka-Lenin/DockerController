@@ -1,11 +1,15 @@
 import requests
 import subprocess
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.repo.repositories_repo import RepositoriesRepo
 from app.repo.version_repo import VersionRepo
 from app.repo.users_repo import UserRepo
+
+from app.adapters.jwt.jwt_adapter import JWT_Adapter
+
 
 
 class RepositoriesRouter:
@@ -15,15 +19,17 @@ class RepositoriesRouter:
         self.versionRepo = VersionRepo
         self.userRepo = UserRepo()
 
+        self.jwt_adapter = JWT_Adapter()
+
         self.router = APIRouter()
 
         self.router.post("/", status_code=200)(self.create)
         self.router.get("/", status_code=200)(self.get)
         self.router.get("/{id}", status_code=200)(self.info)
 
-    async def create(self, url: str, request: Request):
+    async def create(self, url: str, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
 
-        user_id = self.userRepo.get(request)["user_id"]
+        user_id = self.jwt_adapter.get_id(credentials)
 
         mes = self.repositoriesRepo.get(conditions={"user_id": user_id, "url": url})
 
@@ -84,17 +90,17 @@ class RepositoriesRouter:
 
         raise HTTPException(status_code=400, detail="Некорректная ссылка")
 
-    async def get(self, request: Request):
+    async def get(self, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
 
-        user_id = self.userRepo.get(request)["user_id"]
+        user_id = self.jwt_adapter.get_id(credentials)
 
         result = self.repositoriesRepo.get(conditions={"user_id": user_id})
 
         return result
 
-    async def info(self, id, request: Request):
+    async def info(self, id, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
 
-        user_id = self.userRepo.get(request)["user_id"]
+        user_id = self.jwt_adapter.get_id(credentials)
 
         result = self.repositoriesRepo.check(conditions={"id": id, "user_id": user_id})
 
