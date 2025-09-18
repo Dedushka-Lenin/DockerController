@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    login VARCHAR(255) NOT NULL CHECK (LENGTH(login) >= 3) UNIQUE,
+    password VARCHAR(255) NOT NULL CHECK (LENGTH(password) >= 6)
+);

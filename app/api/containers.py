@@ -1,6 +1,7 @@
 import docker
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 
 from app.models.schemas import Containers
@@ -8,6 +9,8 @@ from app.repo.containers_repo import ContainersRepo
 from app.repo.repositories_repo import RepositoriesRepo
 from app.repo.version_repo import VersionRepo
 from app.repo.users_repo import UserRepo
+
+from app.adapters.jwt.jwt_adapter import JWT_Adapter
 
 
 class ContainersRouter:
@@ -19,6 +22,8 @@ class ContainersRouter:
         self.versionRepo = VersionRepo()
         self.userRepo = UserRepo()
 
+        self.jwt_adapter = JWT_Adapter()
+
         self.router = APIRouter()
         self.router.post("/", status_code=200)(self.create)
         self.router.post("/{id}/start", status_code=200)(self.start)
@@ -28,8 +33,13 @@ class ContainersRouter:
         self.router.get("/", status_code=200)(self.get)
         self.router.get("/{id}", status_code=200)(self.info)
 
-    async def create(self, data: Containers, request: Request):
-        user_id = self.userRepo.get(request)["id"]
+    async def create(
+        self,
+        data: Containers,
+        credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    ):
+
+        user_id = self.jwt_adapter.get_id(credentials)
 
         repo_info = self.repositoriesRepo.get(data.repositories_id)
         repo_url = repo_info["url"]
@@ -70,8 +80,11 @@ class ContainersRouter:
 
         return {"message": f"Контейнер {info} успешно запущен"}
 
-    async def start(self, id: int, request: Request):
-        user_id = self.userRepo.get(request)["id"]
+    async def start(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
+
+        user_id = self.jwt_adapter.get_id(credentials)
 
         container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
@@ -79,8 +92,11 @@ class ContainersRouter:
 
         return {"message": "Контейнер успешно запущен"}
 
-    async def stop(self, id: int, request: Request):
-        user_id = self.userRepo.get(request)["id"]
+    async def stop(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
+
+        user_id = self.jwt_adapter.get_id(credentials)
 
         container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
@@ -88,8 +104,11 @@ class ContainersRouter:
 
         return {"message": "Контейнер успешно остановлен"}
 
-    async def restart(self, id: int, request: Request):
-        user_id = self.userRepo.get(request)["id"]
+    async def restart(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
+
+        user_id = self.jwt_adapter.get_id(credentials)
 
         container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
@@ -97,8 +116,11 @@ class ContainersRouter:
 
         return {"message": "Контейнер успешно перезапущен"}
 
-    async def delete(self, id: int, request: Request):
-        user_id = self.userRepo.get(request)["id"]
+    async def delete(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
+
+        user_id = self.jwt_adapter.get_id(credentials)
 
         container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
@@ -109,15 +131,21 @@ class ContainersRouter:
 
         return {"message": "Контейнер успешно удален"}
 
-    async def get(self, request: Request):
-        user_id = self.userRepo.get(request)["id"]
+    async def get(
+        self, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
+
+        user_id = self.jwt_adapter.get_id(credentials)
 
         containers = self.containersRepo.get(conditions={"user_id": user_id})
 
         return JSONResponse(containers)
 
-    async def info(self, id: int, request: Request):
-        user_id = self.userRepo.get(request)["id"]
+    async def info(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
+        user_id = self.jwt_adapter.get_id(credentials)
+
         container_data = self.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         info = container.attrs
