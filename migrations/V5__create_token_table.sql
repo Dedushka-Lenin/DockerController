@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS token (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    token VARCHAR(255) NOT NULL
+);

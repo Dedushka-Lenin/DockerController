@@ -33,7 +33,11 @@ class ContainersRouter:
         self.router.get("/", status_code=200)(self.get)
         self.router.get("/{id}", status_code=200)(self.info)
 
-    async def create(self, data: Containers, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def create(
+        self,
+        data: Containers,
+        credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    ):
 
         user_id = self.jwt_adapter.get_id(credentials)
 
@@ -76,7 +80,9 @@ class ContainersRouter:
 
         return {"message": f"Контейнер {info} успешно запущен"}
 
-    async def start(self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def start(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
 
         user_id = self.jwt_adapter.get_id(credentials)
 
@@ -86,7 +92,9 @@ class ContainersRouter:
 
         return {"message": "Контейнер успешно запущен"}
 
-    async def stop(self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def stop(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
 
         user_id = self.jwt_adapter.get_id(credentials)
 
@@ -96,7 +104,9 @@ class ContainersRouter:
 
         return {"message": "Контейнер успешно остановлен"}
 
-    async def restart(self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def restart(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
 
         user_id = self.jwt_adapter.get_id(credentials)
 
@@ -106,7 +116,9 @@ class ContainersRouter:
 
         return {"message": "Контейнер успешно перезапущен"}
 
-    async def delete(self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def delete(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
 
         user_id = self.jwt_adapter.get_id(credentials)
 
@@ -119,7 +131,9 @@ class ContainersRouter:
 
         return {"message": "Контейнер успешно удален"}
 
-    async def get(self, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def get(
+        self, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
 
         user_id = self.jwt_adapter.get_id(credentials)
 
@@ -127,7 +141,9 @@ class ContainersRouter:
 
         return JSONResponse(containers)
 
-    async def info(self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def info(
+        self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
         user_id = self.jwt_adapter.get_id(credentials)
 
         container_data = self.get(id, user_id)
