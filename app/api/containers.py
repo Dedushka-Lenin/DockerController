@@ -11,6 +11,7 @@ from app.repo.version_repo import VersionRepo
 from app.repo.users_repo import UserRepo
 
 from app.adapters.jwt.jwt_adapter import JWT_Adapter
+from app.adapters.docker.docker_adapter import DockerAdapter
 
 
 class ContainersRouter:
@@ -23,6 +24,7 @@ class ContainersRouter:
         self.userRepo = UserRepo()
 
         self.jwt_adapter = JWT_Adapter()
+        self.dockerAdapter = DockerAdapter()
 
         self.router = APIRouter()
         self.router.post("/", status_code=200)(self.create)
@@ -41,7 +43,10 @@ class ContainersRouter:
 
         user_id = self.jwt_adapter.get_id(credentials)
 
-        repo_info = self.repositoriesRepo.get(data.repositories_id)
+        repo_info = self.repositoriesRepo.get(
+            {"id": data.repositories_id, "user_id": user_id}
+        )[0]
+
         repo_url = repo_info["url"]
         repo_name = repo_info["repositories_name"]
 
@@ -62,12 +67,12 @@ class ContainersRouter:
             image_name = f"{repo_name}:{data.version}"
             container_name = f"{user_id}.{repo_name}.{data.version}"
 
-        if self.containersRepo.check({"containers_name": container_name}, user_id):
+        if self.containersRepo.check(user_id, {"containers_name": container_name}):
             raise HTTPException(status_code=400, detail="Контейнер уже существует")
 
-        self.containersRepo.clone(repo_url, base_dir, data.version)
+        self.dockerAdapter.clone(repo_url, base_dir, data.version)
 
-        container = self.containersRepo.build(base_dir, image_name, container_name)
+        container = self.dockerAdapter.build(base_dir, image_name, container_name)
         info = container.attrs
 
         repositories_data = {
@@ -86,11 +91,19 @@ class ContainersRouter:
 
         user_id = self.jwt_adapter.get_id(credentials)
 
-        container_data = self.get(id, user_id)
-        container = self.client.containers.get(container_data["containers_name"])
+        container_name = self.containersRepo.get(id, user_id)["containers_name"]
+
+        container = self.client.containers.get(container_name)
         container.start()
 
-        return {"message": "Контейнер успешно запущен"}
+        container.reload()
+
+        status = container.status
+
+        if status == "running":
+            return {"message": "Контейнер запущен"}
+        else:
+            return {"message": f"Контейнер не запущен, статус: {status}"}
 
     async def stop(
         self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
@@ -98,11 +111,18 @@ class ContainersRouter:
 
         user_id = self.jwt_adapter.get_id(credentials)
 
-        container_data = self.get(id, user_id)
+        container_data = self.containersRepo.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         container.stop()
 
-        return {"message": "Контейнер успешно остановлен"}
+        container.reload()
+
+        status = container.status
+
+        if status == "exited":
+            return {"message": "Контейнер остановлен"}
+        else:
+            return {"message": f"Контейнер не остановлен, статус: {status}"}
 
     async def restart(
         self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
@@ -110,11 +130,18 @@ class ContainersRouter:
 
         user_id = self.jwt_adapter.get_id(credentials)
 
-        container_data = self.get(id, user_id)
+        container_data = self.containersRepo.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         container.restart()
 
-        return {"message": "Контейнер успешно перезапущен"}
+        container.reload()
+
+        status = container.status
+
+        if status == "running":
+            return {"message": "Контейнер перезапущен"}
+        else:
+            return {"message": f"Контейнер не перезапущен, статус: {status}"}
 
     async def delete(
         self, id: int, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
@@ -122,7 +149,7 @@ class ContainersRouter:
 
         user_id = self.jwt_adapter.get_id(credentials)
 
-        container_data = self.get(id, user_id)
+        container_data = self.containersRepo.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         container.stop()
         container.remove()
@@ -137,7 +164,9 @@ class ContainersRouter:
 
         user_id = self.jwt_adapter.get_id(credentials)
 
-        containers = self.containersRepo.get(conditions={"user_id": user_id})
+        print(user_id)
+
+        containers = self.containersRepo.get_list(user_id=user_id)
 
         return JSONResponse(containers)
 
@@ -146,7 +175,7 @@ class ContainersRouter:
     ):
         user_id = self.jwt_adapter.get_id(credentials)
 
-        container_data = self.get(id, user_id)
+        container_data = self.containersRepo.get(id, user_id)
         container = self.client.containers.get(container_data["containers_name"])
         info = container.attrs
 

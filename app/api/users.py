@@ -41,13 +41,14 @@ class UserRouter:
     async def login(self, user_log: User):
         if not self.userRepo.check({"login": user_log.login}):
             raise HTTPException(status_code=400, detail="Неверные логин или пароль")
-        
+
         user_inf = self.userRepo.get({"login": user_log.login})[0]
 
         if not user_inf or not self.pwd_context.verify(
             user_log.password, user_inf["password"]
         ):
             raise HTTPException(status_code=400, detail="Неверные логин или пароль")
+
         token = self.jwt_adapter.create({"sub": user_inf["id"]})
 
         self.tokenRepo.create(token=token, user_id=user_inf["id"])

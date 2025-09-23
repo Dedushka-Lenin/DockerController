@@ -11,7 +11,6 @@ from app.repo.users_repo import UserRepo
 from app.adapters.jwt.jwt_adapter import JWT_Adapter
 
 
-
 class RepositoriesRouter:
     def __init__(self):
 
@@ -27,7 +26,11 @@ class RepositoriesRouter:
         self.router.get("/", status_code=200)(self.get)
         self.router.get("/{id}", status_code=200)(self.info)
 
-    async def create(self, url: str, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def create(
+        self,
+        url: str,
+        credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    ):
 
         user_id = self.jwt_adapter.get_id(credentials)
 
@@ -43,6 +46,7 @@ class RepositoriesRouter:
         api_url = f"https://api.github.com/repos/{owner}/{repo}"
 
         response = requests.get(api_url)
+
         if response.status_code == 200:
             data = response.json()
 
@@ -90,7 +94,9 @@ class RepositoriesRouter:
 
         raise HTTPException(status_code=400, detail="Некорректная ссылка")
 
-    async def get(self, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def get(
+        self, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
 
         user_id = self.jwt_adapter.get_id(credentials)
 
@@ -98,7 +104,9 @@ class RepositoriesRouter:
 
         return result
 
-    async def info(self, id, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    async def info(
+        self, id, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    ):
 
         user_id = self.jwt_adapter.get_id(credentials)
 
